@@ -522,10 +522,17 @@
 
 <script>
 // ============================================
-// CONFIGURATION - Sheet.best
+// CONFIGURATION - Google Apps Script with Proxy
 // ============================================
-// REPLACE THIS URL WITH YOUR SHEET.BEST API URL
-const SHEETBEST_URL = 'https://sheet.best/api/sheets/YOUR_API_KEY_HERE';
+// REPLACE WITH YOUR ACTUAL SCRIPT ID
+const SCRIPT_ID = 'AKfycbyTEE8czX1imUsQmDA2_qemCFflZH9JTCL1Z82qJZ0kMkdLDqReS_YBBANiokHFJqKGWA';
+
+// Use a reliable CORS proxy
+const CLOUD_URL = 'https://api.allorigins.win/get?url=' + 
+    encodeURIComponent('https://script.google.com/macros/s/' + SCRIPT_ID + '/exec?action=getData');
+
+// Direct URL for POST requests (saving data)
+const CLOUD_URL_POST = 'https://script.google.com/macros/s/' + SCRIPT_ID + '/exec';
 
 const USE_CLOUD = true;
 const SYNC_INTERVAL = 30000;
@@ -618,7 +625,7 @@ function updateSyncStatus(status, message) {
 }
 
 // ============================================
-// CLOUD SYNC - Sheet.best
+// CLOUD SYNC - With Proxy
 // ============================================
 async function syncFromCloud() {
     if (!USE_CLOUD || isSyncing) return;
@@ -627,20 +634,19 @@ async function syncFromCloud() {
     toast('Fetching from cloud...', 'sync');
     
     try {
-        let hasChanges = false;
+        const response = await fetch(CLOUD_URL);
+        const proxyResult = await response.json();
         
-        // Fetch each table from Sheet.best
-        for (const table of ['hours', 'service', 'fuel', 'fluids']) {
-            const response = await fetch(SHEETBEST_URL + '/' + table, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' }
-            });
+        // The proxy wraps the response in a 'contents' property
+        const result = JSON.parse(proxyResult.contents);
+        console.log('📥 Cloud data:', result);
+        
+        if (result.success) {
+            let hasChanges = false;
             
-            if (response.ok) {
-                const cloudRecords = await response.json();
-                console.log(`📥 ${table} data:`, cloudRecords.length + ' records');
-                
-                if (Array.isArray(cloudRecords) && cloudRecords.length > 0) {
+            for (const [table, cloudRecords] of Object.entries(result.data || {})) {
+                if (table === 'lastSync') continue;
+                if (Array.isArray(cloudRecords)) {
                     const localRecords = data[table] || [];
                     if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
                         data[table] = cloudRecords;
@@ -648,21 +654,21 @@ async function syncFromCloud() {
                         console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
                     }
                 }
-            } else {
-                console.log(`⚠️ ${table} not found in cloud, skipping...`);
             }
-        }
-        
-        if (hasChanges) {
-            localStorage.setItem(KEY, JSON.stringify(data));
-            lastSync = new Date().toISOString();
-            localStorage.setItem(KEY + '_lastSync', lastSync);
-            renderAll();
-            toast('Data synced from cloud ✅', 'success');
-            updateSyncStatus('success', 'Fetched from cloud');
+            
+            if (hasChanges) {
+                localStorage.setItem(KEY, JSON.stringify(data));
+                lastSync = new Date().toISOString();
+                localStorage.setItem(KEY + '_lastSync', lastSync);
+                renderAll();
+                toast('Data synced from cloud ✅', 'success');
+                updateSyncStatus('success', 'Fetched from cloud');
+            } else {
+                toast('No changes in cloud', 'sync');
+                updateSyncStatus('success', 'Already in sync');
+            }
         } else {
-            toast('No changes in cloud', 'sync');
-            updateSyncStatus('success', 'Already in sync');
+            throw new Error(result.error || 'Unknown error');
         }
     } catch(e) {
         console.error('Fetch error:', e);
@@ -684,29 +690,18 @@ async function syncToCloud() {
             
             console.log(`📤 Syncing ${table}...`, tableData.length + ' records');
             
-            // Clear existing data in this table
-            await fetch(SHEETBEST_URL + '/' + table, {
-                method: 'DELETE'
+            // Use no-cors mode for POST (can't read response, but data gets saved)
+            await fetch(CLOUD_URL_POST, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'saveData',
+                    table: table,
+                    data: tableData
+                })
             });
-            
-            // Push new data
-            if (tableData.length > 0) {
-                const response = await fetch(SHEETBEST_URL + '/' + table, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(tableData)
-                });
-                
-                if (response.ok) {
-                    console.log(`✅ ${table} synced`);
-                } else {
-                    console.error(`❌ ${table} failed:`, response.status);
-                }
-            } else {
-                console.log(`✅ ${table} cleared (empty)`);
-            }
+            console.log(`✅ ${table} sent to cloud`);
         }
         
         lastSync = new Date().toISOString();
@@ -1232,7 +1227,7 @@ function importData(event) {
 }
 
 // ============================================
-// ADD FUNCTIONS - FIXED
+// ADD FUNCTIONS
 // ============================================
 function addHours() {
     const date = document.getElementById('h-date').value || today();

@@ -324,11 +324,6 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
-        .proxy-fallback {
-            font-size: 10px;
-            color: #888;
-            margin-top: 4px;
-        }
     </style>
 </head>
 <body>
@@ -344,12 +339,9 @@
     <div style="display:flex; align-items:center; gap:8px;">
         <span class="badge-status good" id="headerStatus">✅ Good</span>
         <div class="header-actions">
-            <button class="btn-sm" onclick="syncFromCloud()" title="Sync from cloud">☁️</button>
-            <button class="btn-sm" onclick="syncToCloud()" title="Push to cloud">⬆️</button>
             <button class="btn-sm" onclick="exportData()" title="Export backup">📤</button>
             <button class="btn-sm" onclick="document.getElementById('importInput').click()" title="Import backup">📥</button>
             <input type="file" id="importInput" accept=".json" onchange="importData(event)">
-            <span class="proxy-fallback" id="proxyStatus">🌐</span>
         </div>
     </div>
 </div>
@@ -528,36 +520,12 @@
 
 <script>
 // ============================================
-// CONFIGURATION
-// ============================================
-const SCRIPT_ID = 'AKfycbzfWfOAsv7JrJmDOsP29dhwpcpoAPKU_S929OdoypCXa1TkyOONDnkegIpn3SLmSNtwWg';
-
-// List of proxy servers to try (in order of preference)
-const PROXIES = [
-    { name: 'corsproxy.io', url: 'https://corsproxy.io/?' },
-    { name: 'thingproxy', url: 'https://thingproxy.freeboard.io/fetch/' },
-    { name: 'api.codetabs', url: 'https://api.codetabs.com/v1/proxy?quest=' }
-];
-
-// Fallback: direct URL (may not work due to CORS)
-const DIRECT_URL = 'https://script.google.com/macros/s/' + SCRIPT_ID + '/exec';
-
-const CLOUD_URL_POST = 'https://script.google.com/macros/s/' + SCRIPT_ID + '/exec';
-
-const USE_CLOUD = true;
-const SYNC_INTERVAL = 30000;
-
-// ============================================
-// DATA
+// DATA - LOCAL STORAGE ONLY (No Cloud Sync)
 // ============================================
 const KEY = 'kubota_tracker_v2';
 let data = JSON.parse(localStorage.getItem(KEY) || 'null') || {
     hours: [], service: [], fuel: [], fluids: []
 };
-let lastSync = localStorage.getItem(KEY + '_lastSync') || new Date(0).toISOString();
-let isSyncing = false;
-let syncTimer = null;
-let activeProxy = 0;
 
 // ============================================
 // SERVICE INTERVALS
@@ -615,167 +583,6 @@ function toast(msg, type) {
     el.classList.add('show');
     clearTimeout(el._timeout);
     el._timeout = setTimeout(() => el.classList.remove('show'), 3000);
-}
-
-function updateSyncStatus(status, message) {
-    const el = document.getElementById('syncStatus');
-    if (!el) return;
-    el.className = 'sync-status';
-    if (status === 'success') {
-        el.className = 'sync-status success';
-        el.textContent = '☁️ ' + (message || 'Synced');
-    } else if (status === 'error') {
-        el.className = 'sync-status error';
-        el.textContent = '⚠️ ' + (message || 'Sync failed');
-    } else if (status === 'syncing') {
-        el.className = 'sync-status syncing';
-        el.textContent = '🔄 ' + (message || 'Syncing...');
-    } else {
-        el.textContent = '☁️ ' + (message || 'Local mode');
-    }
-}
-
-function updateProxyStatus(proxyName, working) {
-    const el = document.getElementById('proxyStatus');
-    if (!el) return;
-    if (working) {
-        el.textContent = '🌐 ✅ ' + proxyName;
-        el.style.color = '#28a745';
-    } else {
-        el.textContent = '🌐 ⚠️ ' + proxyName;
-        el.style.color = '#ffc107';
-    }
-}
-
-// ============================================
-// CLOUD SYNC - Try multiple proxies
-// ============================================
-async function syncFromCloud() {
-    if (!USE_CLOUD || isSyncing) return;
-    isSyncing = true;
-    updateSyncStatus('syncing', 'Fetching from cloud...');
-    toast('Fetching from cloud...', 'sync');
-    
-    // Try each proxy in order
-    for (let i = 0; i < PROXIES.length; i++) {
-        const proxy = PROXIES[i];
-        const url = proxy.url + encodeURIComponent('https://script.google.com/macros/s/' + SCRIPT_ID + '/exec?action=getData');
-        
-        try {
-            console.log(`🔄 Trying proxy: ${proxy.name} (${i+1}/${PROXIES.length})`);
-            updateProxyStatus(proxy.name, false);
-            
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' }
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                console.log(`✅ Proxy ${proxy.name} worked!`);
-                updateProxyStatus(proxy.name, true);
-                activeProxy = i;
-                
-                if (result.success) {
-                    let hasChanges = false;
-                    
-                    for (const [table, cloudRecords] of Object.entries(result.data || {})) {
-                        if (table === 'lastSync') continue;
-                        if (Array.isArray(cloudRecords)) {
-                            const localRecords = data[table] || [];
-                            if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
-                                data[table] = cloudRecords;
-                                hasChanges = true;
-                                console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
-                            }
-                        }
-                    }
-                    
-                    if (hasChanges) {
-                        localStorage.setItem(KEY, JSON.stringify(data));
-                        lastSync = new Date().toISOString();
-                        localStorage.setItem(KEY + '_lastSync', lastSync);
-                        renderAll();
-                        toast('Data synced from cloud ✅', 'success');
-                        updateSyncStatus('success', 'Fetched from cloud');
-                    } else {
-                        toast('No changes in cloud', 'sync');
-                        updateSyncStatus('success', 'Already in sync');
-                    }
-                    isSyncing = false;
-                    return;
-                } else {
-                    throw new Error(result.error || 'Unknown error');
-                }
-            }
-        } catch(e) {
-            console.log(`❌ Proxy ${proxy.name} failed:`, e.message);
-            updateProxyStatus(proxy.name, false);
-        }
-    }
-    
-    // If all proxies failed, try direct fetch (may work in some environments)
-    try {
-        console.log('🔄 Trying direct fetch...');
-        const response = await fetch(DIRECT_URL + '?action=getData', {
-            method: 'GET',
-            mode: 'cors',
-            headers: { 'Accept': 'application/json' }
-        });
-        if (response.ok) {
-            const result = await response.json();
-            if (result.success) {
-                // Process data...
-                toast('Data synced from cloud (direct) ✅', 'success');
-                updateSyncStatus('success', 'Fetched from cloud');
-                isSyncing = false;
-                return;
-            }
-        }
-    } catch(e) {
-        console.log('❌ Direct fetch also failed');
-    }
-    
-    toast('All sync methods failed. Check your network.', 'error');
-    updateSyncStatus('error', 'All proxies failed');
-    isSyncing = false;
-}
-
-async function syncToCloud() {
-    if (!USE_CLOUD || isSyncing) return;
-    isSyncing = true;
-    updateSyncStatus('syncing', 'Pushing to cloud...');
-    toast('Pushing data to cloud...', 'sync');
-    
-    try {
-        for (const [table, tableData] of Object.entries(data)) {
-            if (table === 'lastSync') continue;
-            
-            console.log(`📤 Syncing ${table}...`, tableData.length + ' records');
-            
-            await fetch(CLOUD_URL_POST, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'saveData',
-                    table: table,
-                    data: tableData
-                })
-            });
-            console.log(`✅ ${table} sent to cloud`);
-        }
-        
-        lastSync = new Date().toISOString();
-        localStorage.setItem(KEY + '_lastSync', lastSync);
-        updateSyncStatus('success', 'Synced at ' + new Date().toLocaleTimeString());
-        toast('Data sent to cloud ✅', 'success');
-    } catch(e) {
-        console.error('Sync error:', e);
-        updateSyncStatus('error', 'Sync failed');
-        toast('Sync failed: ' + e.message, 'error');
-    }
-    isSyncing = false;
 }
 
 // ============================================
@@ -1386,15 +1193,8 @@ document.getElementById('fl-date').value = today();
 setupSessionListener();
 renderAll();
 
-if (USE_CLOUD) {
-    updateSyncStatus('success', 'Cloud sync enabled');
-} else {
-    updateSyncStatus(null, 'Local mode');
-}
-
 console.log('🚜 Kubota B5000 Tracker loaded');
 console.log('📊 Records:', data.hours.length + ' hours, ' + data.service.length + ' services, ' + data.fuel.length + ' fuel, ' + data.fluids.length + ' fluids');
-console.log('☁️ Cloud sync:', USE_CLOUD ? 'Enabled' : 'Disabled');
 </script>
 </body>
 </html>

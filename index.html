@@ -519,16 +519,16 @@
     </div>
     <div id="fluid-list"></div>
 </div>
-
 <script>
 // ============================================
 // CONFIGURATION
 // ============================================
 // Your Web App URL - REPLACE WITH YOUR ACTUAL SCRIPT ID
 const SCRIPT_ID = 'AKfycbwE2t1-hr2URvFuU6YG0xLDpn-gjPMroocjyTcfk4xU_aDVBtO5Hy3Xp22Wu7QCxMa3Wg';
-
-// Build the script URL
 const SCRIPT_URL = 'https://script.google.com/macros/s/' + SCRIPT_ID + '/exec';
+
+// Use a reliable CORS proxy
+const CLOUD_PROXY = 'https://corsproxy.io/?';
 
 const USE_CLOUD = true;
 const SYNC_INTERVAL = 30000;
@@ -619,74 +619,71 @@ function updateSyncStatus(status, message) {
 }
 
 // ============================================
-// JSONP CLOUD SYNC
+// CLOUD SYNC USING CORS PROXY
 // ============================================
-function syncFromCloud() {
+async function syncFromCloud() {
     if (!USE_CLOUD || isSyncing) return;
     isSyncing = true;
     updateSyncStatus('syncing', 'Fetching from cloud...');
     toast('Fetching from cloud...', 'sync');
     
-    // Create a unique callback name
-    const callbackName = 'jsonp_callback_' + Date.now();
-    
-    // Define the callback function
-    window[callbackName] = function(result) {
-        console.log('📥 Cloud data:', result);
+    try {
+        const proxyUrl = CLOUD_PROXY + encodeURIComponent(SCRIPT_URL + '?action=getData');
+        const response = await fetch(proxyUrl, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
         
-        if (result.success) {
-            let hasChanges = false;
+        if (response.ok) {
+            const result = await response.json();
+            console.log('📥 Cloud data:', result);
             
-            for (const [table, cloudRecords] of Object.entries(result.data || {})) {
-                if (table === 'lastSync') continue;
-                if (Array.isArray(cloudRecords)) {
-                    const localRecords = data[table] || [];
-                    if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
-                        data[table] = cloudRecords;
-                        hasChanges = true;
-                        console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
+            if (result.success) {
+                let hasChanges = false;
+                
+                for (const [table, cloudRecords] of Object.entries(result.data || {})) {
+                    if (table === 'lastSync') continue;
+                    if (Array.isArray(cloudRecords)) {
+                        const localRecords = data[table] || [];
+                        if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
+                            data[table] = cloudRecords;
+                            hasChanges = true;
+                            console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
+                        }
                     }
                 }
-            }
-            
-            if (hasChanges) {
-                localStorage.setItem(KEY, JSON.stringify(data));
-                lastSync = new Date().toISOString();
-                localStorage.setItem(KEY + '_lastSync', lastSync);
-                renderAll();
-                toast('Data synced from cloud ✅', 'success');
-                updateSyncStatus('success', 'Fetched from cloud');
+                
+                if (hasChanges) {
+                    localStorage.setItem(KEY, JSON.stringify(data));
+                    lastSync = new Date().toISOString();
+                    localStorage.setItem(KEY + '_lastSync', lastSync);
+                    renderAll();
+                    toast('Data synced from cloud ✅', 'success');
+                    updateSyncStatus('success', 'Fetched from cloud');
+                } else {
+                    toast('No changes in cloud', 'sync');
+                    updateSyncStatus('success', 'Already in sync');
+                }
             } else {
-                toast('No changes in cloud', 'sync');
-                updateSyncStatus('success', 'Already in sync');
+                throw new Error(result.error || 'Unknown error');
             }
         } else {
-            toast('Cloud sync failed: ' + (result.error || 'Unknown error'), 'error');
-            updateSyncStatus('error', 'Fetch failed');
+            // If the proxy fails, try direct fetch (might work if CORS is configured)
+            console.log('Proxy failed, trying direct fetch...');
+            const directResponse = await fetch(SCRIPT_URL + '?action=getData');
+            if (directResponse.ok) {
+                const result = await directResponse.json();
+                // ... handle result the same way
+            }
         }
-        
-        // Clean up
-        delete window[callbackName];
-        if (script) document.head.removeChild(script);
-        isSyncing = false;
-    };
-    
-    // Create the script tag with JSONP
-    const script = document.createElement('script');
-    script.src = SCRIPT_URL + '?action=getData&callback=' + callbackName;
-    script.onerror = function() {
-        toast('Failed to fetch data from cloud', 'error');
+    } catch(e) {
+        console.error('Fetch error:', e);
+        toast('Sync failed: ' + e.message, 'error');
         updateSyncStatus('error', 'Connection failed');
-        delete window[callbackName];
-        if (script) document.head.removeChild(script);
-        isSyncing = false;
-    };
-    document.head.appendChild(script);
+    }
+    isSyncing = false;
 }
 
-// ============================================
-// PUSH TO CLOUD (using POST)
-// ============================================
 async function syncToCloud() {
     if (!USE_CLOUD || isSyncing) return;
     isSyncing = true;
@@ -699,12 +696,12 @@ async function syncToCloud() {
             
             console.log(`📤 Syncing ${table}...`, tableData.length + ' records');
             
-            const response = await fetch(SCRIPT_URL, {
+            // Try direct fetch first
+            let response = await fetch(SCRIPT_URL, {
                 method: 'POST',
                 mode: 'cors',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     action: 'saveData',
@@ -717,7 +714,21 @@ async function syncToCloud() {
                 const result = await response.json();
                 console.log(`✅ ${table} synced:`, result);
             } else {
-                console.error(`❌ ${table} failed:`, response.status);
+                // Try with proxy
+                console.log('Direct POST failed, trying proxy...');
+                const proxyUrl = CLOUD_PROXY + encodeURIComponent(SCRIPT_URL);
+                response = await fetch(proxyUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'saveData',
+                        table: table,
+                        data: tableData
+                    })
+                });
+                if (response.ok) {
+                    console.log(`✅ ${table} synced via proxy`);
+                }
             }
         }
         

@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Kubota B5000 Tracker</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #f5f5f0;
             padding: 16px;
             max-width: 600px;
             margin: 0 auto;
+            min-height: 100vh;
         }
         .header {
             background: #E6481F;
@@ -75,19 +76,9 @@
             cursor: pointer;
             color: #888;
         }
-        .tab .icon { 
-            font-size: 16px; 
-            filter: grayscale(1);
-            opacity: 0.6;
-        }
-        .tab.active {
-            background: #E6481F;
-            color: white;
-        }
-        .tab.active .icon {
-            filter: grayscale(0);
-            opacity: 1;
-        }
+        .tab .icon { font-size: 16px; filter: grayscale(1); opacity: 0.6; }
+        .tab.active { background: #E6481F; color: white; }
+        .tab.active .icon { filter: grayscale(0); opacity: 1; }
         .panel { display: none; }
         .panel.active { display: block; }
         .card {
@@ -103,17 +94,8 @@
             margin-bottom: 12px;
             color: #333;
         }
-        .card-title .icon {
-            filter: grayscale(1);
-            opacity: 0.6;
-            margin-right: 4px;
-        }
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
+        .card-title .icon { filter: grayscale(1); opacity: 0.6; margin-right: 4px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
         .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
         .form-group label {
             font-size: 12px;
@@ -131,10 +113,7 @@
             background: #f8f6f4;
             font-family: inherit;
         }
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #E6481F;
-        }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #E6481F; }
         .form-group input:read-only {
             background: #FDE8E0;
             border-color: #E6481F;
@@ -166,20 +145,8 @@
         .record-left { flex: 1; }
         .record-title { font-weight: 500; font-size: 14px; color: #333; }
         .record-meta { font-size: 12px; color: #888; margin-top: 2px; }
-        .record-photos {
-            display: flex;
-            gap: 4px;
-            flex-wrap: wrap;
-            margin-top: 4px;
-        }
-        .record-photos img {
-            width: 40px;
-            height: 40px;
-            object-fit: cover;
-            border-radius: 4px;
-            border: 0.5px solid #ddd;
-            cursor: pointer;
-        }
+        .record-photos { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+        .record-photos img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 0.5px solid #ddd; cursor: pointer; }
         .btn-danger {
             background: none;
             border: 1px solid #dc3545;
@@ -227,10 +194,7 @@
             background: #FDE8E0;
             border-radius: 6px;
         }
-        .photo-thumb-container {
-            position: relative;
-            display: inline-block;
-        }
+        .photo-thumb-container { position: relative; display: inline-block; }
         .photo-remove {
             position: absolute;
             top: -6px;
@@ -257,18 +221,8 @@
             margin-top: 4px;
         }
         .btn-photo:active { background: #FDE8E0; }
-        .cost-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            font-size: 14px;
-            color: #555;
-        }
-        .cost-item .icon {
-            filter: grayscale(1);
-            opacity: 0.5;
-            margin-right: 4px;
-        }
+        .cost-item { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; color: #555; }
+        .cost-item .icon { filter: grayscale(1); opacity: 0.5; margin-right: 4px; }
         .cost-total {
             display: flex;
             justify-content: space-between;
@@ -280,13 +234,7 @@
             color: #333;
         }
         .cost-total .amount { color: #E6481F; }
-        .hours-attachment {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-            font-size: 14px;
-            color: #555;
-        }
+        .hours-attachment { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; color: #555; }
         .hours-attachment .value { font-weight: 500; color: #333; }
         .service-status-box {
             display: flex;
@@ -322,35 +270,16 @@
         }
         .service-grid .item.danger { border-left-color: #dc3545; }
         .service-grid .item.warning { border-left-color: #ffc107; }
-        .service-grid .item .name { 
-            font-size: 11px; 
-            color: #888; 
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-weight: 600;
-        }
-        .service-grid .item .countdown { 
-            font-size: 20px; 
-            font-weight: 700; 
-            color: #333;
-            margin-top: 2px;
-        }
+        .service-grid .item .name { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
+        .service-grid .item .countdown { font-size: 20px; font-weight: 700; color: #333; margin-top: 2px; }
         .service-grid .item .countdown.danger { color: #dc3545; }
         .service-grid .item .countdown.warning { color: #856404; }
         .service-grid .item .countdown.ok { color: #28a745; }
-        .service-grid .item .status-text {
-            font-size: 10px;
-            font-weight: 600;
-            margin-top: 2px;
-        }
+        .service-grid .item .status-text { font-size: 10px; font-weight: 600; margin-top: 2px; }
         .service-grid .item .status-text.ok { color: #28a745; }
         .service-grid .item .status-text.warning { color: #856404; }
         .service-grid .item .status-text.danger { color: #dc3545; }
-        .service-grid .item .due-label {
-            font-size: 9px;
-            color: #aaa;
-            margin-top: 1px;
-        }
+        .service-grid .item .due-label { font-size: 9px; color: #aaa; margin-top: 1px; }
         .stat-grid-dash {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -382,15 +311,7 @@
             color: #333;
         }
         .dash-section-title .icon { filter: grayscale(1); opacity: 0.5; margin-right: 4px; }
-        .hidden { display: none; }
         #importInput { display: none; }
-        .record-actions {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 6px;
-            flex-shrink: 0;
-        }
         .sync-status {
             font-size: 10px;
             opacity: 0.7;
@@ -436,9 +357,7 @@
 </div>
 
 <!-- DASHBOARD -->
-<div id="panel-dashboard" class="panel active">
-    <div id="dash-content"></div>
-</div>
+<div id="panel-dashboard" class="panel active"><div id="dash-content"></div></div>
 
 <!-- HOURS -->
 <div id="panel-hours" class="panel">
@@ -605,7 +524,7 @@
 // ============================================
 // CONFIGURATION - REPLACE WITH YOUR WEB APP URL
 // ============================================
-const CLOUD_URL = 'https://script.google.com/macros/s/AKfycbwE2t1-hr2URvFuU6YG0xLDpn-gjPMroocjyTcfk4xU_aDVBtO5Hy3Xp22Wu7QCxMa3Wg/exec';
+const CLOUD_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
 const USE_CLOUD = true;
 const SYNC_INTERVAL = 30000;
 
@@ -697,50 +616,6 @@ function updateSyncStatus(status, message) {
 // ============================================
 // SIMPLIFIED CLOUD SYNC
 // ============================================
-async function syncToCloud() {
-    if (!USE_CLOUD || isSyncing) return;
-    isSyncing = true;
-    updateSyncStatus('syncing', 'Pushing to cloud...');
-    toast('Pushing data to cloud...', 'sync');
-    
-    try {
-        // Sync each table
-        for (const [table, tableData] of Object.entries(data)) {
-            if (table === 'lastSync') continue;
-            
-            console.log(`📤 Syncing ${table}...`, tableData.length + ' records');
-            
-            const response = await fetch(CLOUD_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'saveData',
-                    table: table,
-                    data: tableData
-                })
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                console.log(`✅ ${table} synced:`, result);
-            } else {
-                console.error(`❌ ${table} failed:`, response.status);
-            }
-        }
-        
-        lastSync = new Date().toISOString();
-        localStorage.setItem(KEY + '_lastSync', lastSync);
-        updateSyncStatus('success', 'Synced at ' + new Date().toLocaleTimeString());
-        toast('Data synced to cloud ✅', 'success');
-    } catch(e) {
-        console.error('Sync error:', e);
-        updateSyncStatus('error', 'Sync failed');
-        toast('Sync failed: ' + e.message, 'error');
-    }
-    isSyncing = false;
-}
-
 async function syncFromCloud() {
     if (!USE_CLOUD || isSyncing) return;
     isSyncing = true;
@@ -752,7 +627,10 @@ async function syncFromCloud() {
         const response = await fetch(url, {
             method: 'GET',
             mode: 'cors',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
         });
         
         if (response.ok) {
@@ -762,7 +640,6 @@ async function syncFromCloud() {
             if (result.success) {
                 let hasChanges = false;
                 
-                // Update local data with cloud data
                 for (const [table, cloudRecords] of Object.entries(result.data || {})) {
                     if (table === 'lastSync') continue;
                     if (Array.isArray(cloudRecords)) {
@@ -796,6 +673,52 @@ async function syncFromCloud() {
         console.error('Fetch error:', e);
         toast('Sync failed: ' + e.message, 'error');
         updateSyncStatus('error', 'Connection failed');
+    }
+    isSyncing = false;
+}
+
+async function syncToCloud() {
+    if (!USE_CLOUD || isSyncing) return;
+    isSyncing = true;
+    updateSyncStatus('syncing', 'Pushing to cloud...');
+    toast('Pushing data to cloud...', 'sync');
+    
+    try {
+        for (const [table, tableData] of Object.entries(data)) {
+            if (table === 'lastSync') continue;
+            
+            console.log(`📤 Syncing ${table}...`, tableData.length + ' records');
+            
+            const response = await fetch(CLOUD_URL, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'saveData',
+                    table: table,
+                    data: tableData
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log(`✅ ${table} synced:`, result);
+            } else {
+                console.error(`❌ ${table} failed:`, response.status);
+            }
+        }
+        
+        lastSync = new Date().toISOString();
+        localStorage.setItem(KEY + '_lastSync', lastSync);
+        updateSyncStatus('success', 'Synced at ' + new Date().toLocaleTimeString());
+        toast('Data synced to cloud ✅', 'success');
+    } catch(e) {
+        console.error('Sync error:', e);
+        updateSyncStatus('error', 'Sync failed');
+        toast('Sync failed: ' + e.message, 'error');
     }
     isSyncing = false;
 }
@@ -928,18 +851,12 @@ function updateAutoFields() {
     const latestStr = latest > 0 ? fmt(latest) : '0.0';
     
     const currentReading = document.getElementById('h-current-reading');
-    if (currentReading) {
-        currentReading.textContent = 'Total hours: ' + latestStr + ' hrs';
-    }
+    if (currentReading) currentReading.textContent = 'Total hours: ' + latestStr + ' hrs';
     
     const sHours = document.getElementById('s-hours');
     const sDisplay = document.getElementById('s-hours-display');
-    if (sHours) {
-        sHours.value = latest > 0 ? latest : '';
-    }
-    if (sDisplay) {
-        sDisplay.textContent = latestStr;
-    }
+    if (sHours) sHours.value = latest > 0 ? latest : '';
+    if (sDisplay) sDisplay.textContent = latestStr;
     
     const fDisplay = document.getElementById('f-hours-display');
     if (fDisplay) fDisplay.textContent = latestStr;
@@ -957,13 +874,9 @@ function updateAutoFields() {
     }
 }
 
-// ============================================
-// SETUP SESSION INPUT LISTENER
-// ============================================
 function setupSessionListener() {
     const sessionInput = document.getElementById('h-session');
     const tractorInput = document.getElementById('h-tractor');
-    const readingDisplay = document.getElementById('h-current-reading');
     
     if (sessionInput && tractorInput) {
         const newSession = sessionInput.cloneNode(true);
@@ -1030,7 +943,7 @@ function takePhoto(recordType, recordIndex) {
 }
 
 // ============================================
-// RENDER DASHBOARD
+// RENDER FUNCTIONS
 // ============================================
 function renderDashboard() {
     const el = document.getElementById('dash-content');
@@ -1181,16 +1094,11 @@ function renderDashboard() {
                     <div class="detail">${statusDetail}</div>
                 </div>
             </div>
-            <div class="service-grid">
-                ${serviceGridHTML}
-            </div>
+            <div class="service-grid">${serviceGridHTML}</div>
         </div>
     `;
 }
 
-// ============================================
-// RENDER LISTS
-// ============================================
 function renderHours() {
     const el = document.getElementById('hours-list');
     if (!data.hours.length) { el.innerHTML = '<div class="empty">No hours logged yet</div>'; return; }
@@ -1215,7 +1123,6 @@ function renderHours() {
 function renderService() {
     const el = document.getElementById('service-list');
     if (!data.service.length) { el.innerHTML = '<div class="empty">No service records yet</div>'; return; }
-    
     el.innerHTML = [...data.service].reverse().map((s, i) => {
         const idx = data.service.length - 1 - i;
         const config = SERVICE_INTERVALS[s.type];
@@ -1404,9 +1311,6 @@ function addFluid() {
     toast('Fluid change logged ✅', 'success');
 }
 
-// ============================================
-// DELETE
-// ============================================
 function del(arr, idx) {
     if (!confirm('Delete this record?')) return;
     data[arr].splice(idx, 1);
@@ -1424,7 +1328,6 @@ document.getElementById('fl-date').value = today();
 setupSessionListener();
 renderAll();
 
-// Set up auto-sync
 if (USE_CLOUD) {
     setTimeout(syncFromCloud, 2000);
     setInterval(() => {

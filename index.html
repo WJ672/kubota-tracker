@@ -529,10 +529,10 @@ const SCRIPT_ID = 'AKfycbwE2t1-hr2URvFuU6YG0xLDpn-gjPMroocjyTcfk4xU_aDVBtO5Hy3Xp
 
 // Use CORS proxy for GET requests (reading data)
 const CLOUD_URL_GET = 'https://api.allorigins.win/get?url=' + 
-    encodeURIComponent('https://script.google.com/macros/s/' + AKfycbwE2t1-hr2URvFuU6YG0xLDpn-gjPMroocjyTcfk4xU_aDVBtO5Hy3Xp22Wu7QCxMa3Wg + '/exec?action=getData');
+    encodeURIComponent('https://script.google.com/macros/s/' + SCRIPT_ID + '/exec?action=getData');
 
 // Use direct URL for POST requests (saving data) - using no-cors mode
-const CLOUD_URL_POST = 'https://script.google.com/macros/s/' + AKfycbwE2t1-hr2URvFuU6YG0xLDpn-gjPMroocjyTcfk4xU_aDVBtO5Hy3Xp22Wu7QCxMa3Wg + '/exec';
+const CLOUD_URL_POST = 'https://script.google.com/macros/s/' + SCRIPT_ID + '/exec';
 
 const USE_CLOUD = true;
 const SYNC_INTERVAL = 30000;

@@ -522,9 +522,18 @@
 
 <script>
 // ============================================
-// CONFIGURATION - REPLACE WITH YOUR WEB APP URL
+// CONFIGURATION
 // ============================================
-const CLOUD_URL = 'https://script.google.com/macros/s/AKfycbwE2t1-hr2URvFuU6YG0xLDpn-gjPMroocjyTcfk4xU_aDVBtO5Hy3Xp22Wu7QCxMa3Wg/exec';
+// Your Web App URL - REPLACE WITH YOUR ACTUAL URL
+const SCRIPT_ID = 'https://script.google.com/macros/s/AKfycbwE2t1-hr2URvFuU6YG0xLDpn-gjPMroocjyTcfk4xU_aDVBtO5Hy3Xp22Wu7QCxMa3Wg/exec';
+
+// Use CORS proxy for GET requests (reading data)
+const CLOUD_URL_GET = 'https://api.allorigins.win/get?url=' + 
+    encodeURIComponent('https://script.google.com/macros/s/' + SCRIPT_ID + '/exec?action=getData');
+
+// Use direct URL for POST requests (saving data) - using no-cors mode
+const CLOUD_URL_POST = 'https://script.google.com/macros/s/' + SCRIPT_ID + '/exec';
+
 const USE_CLOUD = true;
 const SYNC_INTERVAL = 30000;
 
@@ -614,7 +623,7 @@ function updateSyncStatus(status, message) {
 }
 
 // ============================================
-// SIMPLIFIED CLOUD SYNC
+// CLOUD SYNC - Using CORS Proxy for GET, no-cors for POST
 // ============================================
 async function syncFromCloud() {
     if (!USE_CLOUD || isSyncing) return;
@@ -623,51 +632,39 @@ async function syncFromCloud() {
     toast('Fetching from cloud...', 'sync');
     
     try {
-        const url = CLOUD_URL + '?action=getData';
-        const response = await fetch(url, {
-            method: 'GET',
-            mode: 'cors',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        });
+        const response = await fetch(CLOUD_URL_GET);
+        const proxyResult = await response.json();
+        const result = JSON.parse(proxyResult.contents);
+        console.log('📥 Cloud data:', result);
         
-        if (response.ok) {
-            const result = await response.json();
-            console.log('📥 Cloud data:', result);
+        if (result.success) {
+            let hasChanges = false;
             
-            if (result.success) {
-                let hasChanges = false;
-                
-                for (const [table, cloudRecords] of Object.entries(result.data || {})) {
-                    if (table === 'lastSync') continue;
-                    if (Array.isArray(cloudRecords)) {
-                        const localRecords = data[table] || [];
-                        if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
-                            data[table] = cloudRecords;
-                            hasChanges = true;
-                            console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
-                        }
+            for (const [table, cloudRecords] of Object.entries(result.data || {})) {
+                if (table === 'lastSync') continue;
+                if (Array.isArray(cloudRecords)) {
+                    const localRecords = data[table] || [];
+                    if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
+                        data[table] = cloudRecords;
+                        hasChanges = true;
+                        console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
                     }
                 }
-                
-                if (hasChanges) {
-                    localStorage.setItem(KEY, JSON.stringify(data));
-                    lastSync = new Date().toISOString();
-                    localStorage.setItem(KEY + '_lastSync', lastSync);
-                    renderAll();
-                    toast('Data synced from cloud ✅', 'success');
-                    updateSyncStatus('success', 'Fetched from cloud');
-                } else {
-                    toast('No changes in cloud', 'sync');
-                    updateSyncStatus('success', 'Already in sync');
-                }
+            }
+            
+            if (hasChanges) {
+                localStorage.setItem(KEY, JSON.stringify(data));
+                lastSync = new Date().toISOString();
+                localStorage.setItem(KEY + '_lastSync', lastSync);
+                renderAll();
+                toast('Data synced from cloud ✅', 'success');
+                updateSyncStatus('success', 'Fetched from cloud');
             } else {
-                throw new Error(result.error || 'Unknown error');
+                toast('No changes in cloud', 'sync');
+                updateSyncStatus('success', 'Already in sync');
             }
         } else {
-            throw new Error('HTTP ' + response.status);
+            throw new Error(result.error || 'Unknown error');
         }
     } catch(e) {
         console.error('Fetch error:', e);
@@ -689,32 +686,23 @@ async function syncToCloud() {
             
             console.log(`📤 Syncing ${table}...`, tableData.length + ' records');
             
-            const response = await fetch(CLOUD_URL, {
+            await fetch(CLOUD_URL_POST, {
                 method: 'POST',
-                mode: 'cors',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'saveData',
                     table: table,
                     data: tableData
                 })
             });
-            
-            if (response.ok) {
-                const result = await response.json();
-                console.log(`✅ ${table} synced:`, result);
-            } else {
-                console.error(`❌ ${table} failed:`, response.status);
-            }
+            console.log(`✅ ${table} sent to cloud`);
         }
         
         lastSync = new Date().toISOString();
         localStorage.setItem(KEY + '_lastSync', lastSync);
         updateSyncStatus('success', 'Synced at ' + new Date().toLocaleTimeString());
-        toast('Data synced to cloud ✅', 'success');
+        toast('Data sent to cloud ✅', 'success');
     } catch(e) {
         console.error('Sync error:', e);
         updateSyncStatus('error', 'Sync failed');

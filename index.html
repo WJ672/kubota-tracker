@@ -522,13 +522,13 @@
 
 <script>
 // ============================================
-// CONFIGURATION - Google Apps Script with Reliable Proxy
+// CONFIGURATION
 // ============================================
 const SCRIPT_ID = 'AKfycbzfWfOAsv7JrJmDOsP29dhwpcpoAPKU_S929OdoypCXa1TkyOONDnkegIpn3SLmSNtwWg';
 
-// Use corsproxy.io - more reliable than allorigins
-const PROXY_URL = 'https://corsproxy.io/?';
-const CLOUD_URL = PROXY_URL + encodeURIComponent('https://script.google.com/macros/s/' + SCRIPT_ID + '/exec?action=getData');
+// Use thingproxy.freeboard.io as a CORS proxy (most reliable for Google Apps Script)
+const PROXY_URL = 'https://thingproxy.freeboard.io/fetch/';
+const CLOUD_URL_GET = PROXY_URL + encodeURIComponent('https://script.google.com/macros/s/' + SCRIPT_ID + '/exec?action=getData');
 const CLOUD_URL_POST = 'https://script.google.com/macros/s/' + SCRIPT_ID + '/exec';
 
 const USE_CLOUD = true;
@@ -622,48 +622,7 @@ function updateSyncStatus(status, message) {
 }
 
 // ============================================
-// SIMPLIFIED CLOUD SYNC - PUSH ONLY (MOST RELIABLE)
-// ============================================
-async function syncToCloud() {
-    if (!USE_CLOUD || isSyncing) return;
-    isSyncing = true;
-    updateSyncStatus('syncing', 'Pushing to cloud...');
-    toast('Pushing data to cloud...', 'sync');
-    
-    try {
-        for (const [table, tableData] of Object.entries(data)) {
-            if (table === 'lastSync') continue;
-            
-            console.log(`📤 Syncing ${table}...`, tableData.length + ' records');
-            
-            // Use no-cors mode for POST (can't read response, but data gets saved)
-            await fetch(CLOUD_URL_POST, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'saveData',
-                    table: table,
-                    data: tableData
-                })
-            });
-            console.log(`✅ ${table} sent to cloud`);
-        }
-        
-        lastSync = new Date().toISOString();
-        localStorage.setItem(KEY + '_lastSync', lastSync);
-        updateSyncStatus('success', 'Synced at ' + new Date().toLocaleTimeString());
-        toast('Data sent to cloud ✅', 'success');
-    } catch(e) {
-        console.error('Sync error:', e);
-        updateSyncStatus('error', 'Sync failed');
-        toast('Sync failed: ' + e.message, 'error');
-    }
-    isSyncing = false;
-}
-
-// ============================================
-// PULL FROM CLOUD - SIMPLIFIED
+// CLOUD SYNC - Using ThingProxy
 // ============================================
 async function syncFromCloud() {
     if (!USE_CLOUD || isSyncing) return;
@@ -672,11 +631,7 @@ async function syncFromCloud() {
     toast('Fetching from cloud...', 'sync');
     
     try {
-        // Use a different proxy that's more reliable
-        const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest=' + 
-            encodeURIComponent('https://script.google.com/macros/s/' + SCRIPT_ID + '/exec?action=getData');
-        
-        const response = await fetch(proxyUrl);
+        const response = await fetch(CLOUD_URL_GET);
         const result = await response.json();
         console.log('📥 Cloud data:', result);
         
@@ -686,14 +641,11 @@ async function syncFromCloud() {
             for (const [table, cloudRecords] of Object.entries(result.data || {})) {
                 if (table === 'lastSync') continue;
                 if (Array.isArray(cloudRecords)) {
-                    // Only update if there are records
-                    if (cloudRecords.length > 0) {
-                        const localRecords = data[table] || [];
-                        if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
-                            data[table] = cloudRecords;
-                            hasChanges = true;
-                            console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
-                        }
+                    const localRecords = data[table] || [];
+                    if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
+                        data[table] = cloudRecords;
+                        hasChanges = true;
+                        console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
                     }
                 }
             }
@@ -716,6 +668,43 @@ async function syncFromCloud() {
         console.error('Fetch error:', e);
         toast('Sync failed: ' + e.message, 'error');
         updateSyncStatus('error', 'Connection failed');
+    }
+    isSyncing = false;
+}
+
+async function syncToCloud() {
+    if (!USE_CLOUD || isSyncing) return;
+    isSyncing = true;
+    updateSyncStatus('syncing', 'Pushing to cloud...');
+    toast('Pushing data to cloud...', 'sync');
+    
+    try {
+        for (const [table, tableData] of Object.entries(data)) {
+            if (table === 'lastSync') continue;
+            
+            console.log(`📤 Syncing ${table}...`, tableData.length + ' records');
+            
+            await fetch(CLOUD_URL_POST, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'saveData',
+                    table: table,
+                    data: tableData
+                })
+            });
+            console.log(`✅ ${table} sent to cloud`);
+        }
+        
+        lastSync = new Date().toISOString();
+        localStorage.setItem(KEY + '_lastSync', lastSync);
+        updateSyncStatus('success', 'Synced at ' + new Date().toLocaleTimeString());
+        toast('Data sent to cloud ✅', 'success');
+    } catch(e) {
+        console.error('Sync error:', e);
+        updateSyncStatus('error', 'Sync failed');
+        toast('Sync failed: ' + e.message, 'error');
     }
     isSyncing = false;
 }
@@ -821,9 +810,6 @@ function save() {
     localStorage.setItem(KEY, JSON.stringify(data));
     renderAll();
     updateHeaderStatus();
-    
-    // Don't auto-sync - let user control when to push
-    // This prevents the instability
 }
 
 // ============================================
@@ -1240,11 +1226,9 @@ function addHours() {
     
     if (!session) { toast('Please enter hours worked', 'error'); return; }
     
-    // Calculate the new total
     let currentTotal = getLatestHours();
     let newTotal = currentTotal + Number(session);
     
-    // If tractor field has a value, use it instead
     if (tractor && Number(tractor) > 0) {
         newTotal = Number(tractor);
     }
@@ -1333,9 +1317,8 @@ document.getElementById('fl-date').value = today();
 setupSessionListener();
 renderAll();
 
-// Enable cloud sync but DON'T auto-pull (prevents instability)
 if (USE_CLOUD) {
-    updateSyncStatus('success', 'Cloud sync enabled (push to cloud to save)');
+    updateSyncStatus('success', 'Cloud sync enabled');
 } else {
     updateSyncStatus(null, 'Local mode');
 }

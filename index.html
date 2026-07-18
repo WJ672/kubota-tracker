@@ -16,7 +16,7 @@
         .header {
             background: #E6481F;
             border-radius: 12px;
-            padding: 20px;
+            padding: 16px 20px;
             color: white;
             margin-bottom: 20px;
             display: flex;
@@ -24,10 +24,10 @@
             align-items: center;
         }
         .header h1 { font-size: 20px; }
-        .header .sub { font-size: 13px; opacity: 0.85; }
+        .header .sub { font-size: 12px; opacity: 0.85; }
         .header-actions {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             align-items: center;
         }
         .header-actions .btn-sm {
@@ -42,6 +42,14 @@
         }
         .header-actions .btn-sm:hover { background: rgba(255,255,255,0.2); }
         .header-actions .btn-sm:active { transform: scale(0.95); }
+        .header-actions .btn-sm.sync-active {
+            background: rgba(255,255,255,0.3);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
         .badge-status {
             font-size: 11px;
             padding: 4px 14px;
@@ -60,9 +68,12 @@
             padding: 4px;
             margin-bottom: 20px;
             border: 1px solid #e5e0db;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .tab {
             flex: 1;
+            min-width: 60px;
             padding: 10px;
             text-align: center;
             border: none;
@@ -151,10 +162,6 @@
             width: 100%;
         }
         .btn:active { transform: scale(0.98); }
-        .btn-secondary {
-            background: #e5e0db;
-            color: #333;
-        }
         .record {
             background: #f8f6f4;
             padding: 12px;
@@ -165,9 +172,7 @@
             justify-content: space-between;
             align-items: flex-start;
         }
-        .record-left {
-            flex: 1;
-        }
+        .record-left { flex: 1; }
         .record-title { font-weight: 500; font-size: 14px; color: #333; }
         .record-meta { font-size: 12px; color: #888; margin-top: 2px; }
         .record-photos {
@@ -211,6 +216,9 @@
             z-index: 999;
         }
         .toast.show { opacity: 1; }
+        .toast.success { background: #28a745; }
+        .toast.error { background: #dc3545; }
+        .toast.sync { background: #007bff; }
         .auto-badge {
             font-size: 9px;
             background: #FDE8E0;
@@ -290,7 +298,6 @@
         }
         .hours-attachment .value { font-weight: 500; color: #333; }
         
-        /* ===== SERVICE STATUS ===== */
         .service-status-box {
             display: flex;
             align-items: center;
@@ -300,42 +307,17 @@
             margin-bottom: 12px;
             border: 1px solid transparent;
         }
-        .service-status-box.ok { 
-            background: #d4edda; 
-            border-color: #28a745;
-            border-left: 4px solid #28a745;
-        }
-        .service-status-box.warning { 
-            background: #fff3cd; 
-            border-color: #ffc107;
-            border-left: 4px solid #ffc107;
-        }
-        .service-status-box.danger { 
-            background: #f8d7da; 
-            border-color: #dc3545;
-            border-left: 4px solid #dc3545;
-        }
-        .service-status-box .icon { 
-            font-size: 28px; 
-            filter: grayscale(0); 
-            opacity: 1;
-            flex-shrink: 0;
-        }
+        .service-status-box.ok { background: #d4edda; border-color: #28a745; border-left: 4px solid #28a745; }
+        .service-status-box.warning { background: #fff3cd; border-color: #ffc107; border-left: 4px solid #ffc107; }
+        .service-status-box.danger { background: #f8d7da; border-color: #dc3545; border-left: 4px solid #dc3545; }
+        .service-status-box .icon { font-size: 28px; filter: grayscale(0); opacity: 1; flex-shrink: 0; }
         .service-status-box .info { flex: 1; }
-        .service-status-box .info .status { 
-            font-size: 16px; 
-            font-weight: 700; 
-        }
-        .service-status-box .info .detail { 
-            font-size: 13px; 
-            color: #555; 
-            margin-top: 2px;
-        }
+        .service-status-box .info .status { font-size: 16px; font-weight: 700; }
+        .service-status-box .info .detail { font-size: 13px; color: #555; margin-top: 2px; }
         .service-status-box.ok .info .status { color: #155724; }
         .service-status-box.warning .info .status { color: #856404; }
         .service-status-box.danger .info .status { color: #721c24; }
 
-        /* Service Grid */
         .service-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -421,6 +403,14 @@
             gap: 6px;
             flex-shrink: 0;
         }
+        .sync-status {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+        .sync-status.success { color: #28a745; }
+        .sync-status.error { color: #dc3545; }
+        .sync-status.syncing { color: #007bff; animation: pulse 0.5s infinite; }
     </style>
 </head>
 <body>
@@ -431,12 +421,15 @@
     <div>
         <h1>🚜 Kubota B5000</h1>
         <div class="sub">Maintenance Tracker</div>
+        <div class="sync-status" id="syncStatus">☁️ Local mode</div>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
         <span class="badge-status good" id="headerStatus">✅ Good</span>
         <div class="header-actions">
-            <button class="btn-sm" onclick="exportData()">📤</button>
-            <button class="btn-sm" onclick="document.getElementById('importInput').click()">📥</button>
+            <button class="btn-sm" onclick="syncFromCloud()" title="Sync from cloud">☁️</button>
+            <button class="btn-sm" onclick="syncToCloud()" title="Push to cloud">⬆️</button>
+            <button class="btn-sm" onclick="exportData()" title="Export backup">📤</button>
+            <button class="btn-sm" onclick="document.getElementById('importInput').click()" title="Import backup">📥</button>
             <input type="file" id="importInput" accept=".json" onchange="importData(event)">
         </div>
     </div>
@@ -618,15 +611,30 @@
 
 <script>
 // ============================================
+// CONFIGURATION
+// ============================================
+// REPLACE THIS URL WITH YOUR GOOGLE APPS SCRIPT WEB APP URL
+const CLOUD_URL = 'https://script.google.com/macros/s/AKfycbxkd6VvawcRIN9SD9pffvW12cX-mLcxzXcz86ZpFHFTXfUYXA9-rHhE16Go5v0qm3BP/exec';
+
+// Set to true to enable cloud sync
+const USE_CLOUD = true;
+
+// Sync interval in milliseconds (30 seconds)
+const SYNC_INTERVAL = 30000;
+
+// ============================================
 // DATA
 // ============================================
 const KEY = 'kubota_tracker_v2';
 let data = JSON.parse(localStorage.getItem(KEY) || 'null') || {
     hours: [], service: [], fuel: [], fluids: []
 };
+let lastSync = localStorage.getItem(KEY + '_lastSync') || new Date(0).toISOString();
+let isSyncing = false;
+let syncTimer = null;
 
 // ============================================
-// SERVICE INTERVALS (Hours)
+// SERVICE INTERVALS
 // ============================================
 const SERVICE_INTERVALS = {
     'engine_oil': { interval: 125, name: 'Engine Oil Change', emoji: '🛢️' },
@@ -641,17 +649,15 @@ const SERVICE_INTERVALS = {
     'break_in': { interval: 50, name: 'Break-In Service', emoji: '🔰' }
 };
 
-function save() {
-    localStorage.setItem(KEY, JSON.stringify(data));
-    renderAll();
-}
-
-function toast(msg) {
-    const el = document.getElementById('toast');
-    el.textContent = msg;
-    el.classList.add('show');
-    clearTimeout(el._timeout);
-    el._timeout = setTimeout(() => el.classList.remove('show'), 2500);
+// ============================================
+// HELPERS
+// ============================================
+function fmt(n) { return Number(n).toFixed(1); }
+function fmtCost(n) { return '฿' + Number(n).toLocaleString(); }
+function today() { return new Date().toISOString().split('T')[0]; }
+function attachLabel(v) {
+    const map = { none:'No attachment', mower:'Mower', tiller:'Rotary tiller', 'bed-raiser':'Bed raiser' };
+    return map[v] || v;
 }
 
 function getLatestHours() {
@@ -670,12 +676,141 @@ function getTotalAttachmentHours(attachName) {
         .reduce((sum, h) => sum + (Number(h.session) || 0), 0);
 }
 
-function fmt(n) { return Number(n).toFixed(1); }
-function fmtCost(n) { return '฿' + Number(n).toLocaleString(); }
-function today() { return new Date().toISOString().split('T')[0]; }
-function attachLabel(v) {
-    const map = { none:'No attachment', mower:'Mower', tiller:'Rotary tiller', 'bed-raiser':'Bed raiser' };
-    return map[v] || v;
+// ============================================
+// TOAST NOTIFICATIONS
+// ============================================
+function toast(msg, type) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast';
+    if (type) el.classList.add(type);
+    el.classList.add('show');
+    clearTimeout(el._timeout);
+    el._timeout = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function updateSyncStatus(status, message) {
+    const el = document.getElementById('syncStatus');
+    if (!el) return;
+    el.className = 'sync-status';
+    if (status === 'success') {
+        el.className = 'sync-status success';
+        el.textContent = '☁️ ' + (message || 'Synced');
+    } else if (status === 'error') {
+        el.className = 'sync-status error';
+        el.textContent = '⚠️ ' + (message || 'Sync failed');
+    } else if (status === 'syncing') {
+        el.className = 'sync-status syncing';
+        el.textContent = '🔄 ' + (message || 'Syncing...');
+    } else {
+        el.textContent = '☁️ ' + (message || 'Local mode');
+    }
+}
+
+// ============================================
+// CLOUD SYNC
+// ============================================
+async function syncToCloud() {
+    if (!USE_CLOUD) return;
+    if (isSyncing) return;
+    
+    isSyncing = true;
+    updateSyncStatus('syncing', 'Pushing to cloud...');
+    
+    try {
+        const response = await fetch(CLOUD_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'saveData',
+                table: 'hours',
+                data: data.hours
+            })
+        });
+        
+        // Also sync other tables
+        for (const [table, tableData] of Object.entries(data)) {
+            if (table === 'hours') continue;
+            await fetch(CLOUD_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'saveData',
+                    table: table,
+                    data: tableData
+                })
+            });
+        }
+        
+        lastSync = new Date().toISOString();
+        localStorage.setItem(KEY + '_lastSync', lastSync);
+        updateSyncStatus('success', 'Synced at ' + new Date().toLocaleTimeString());
+        toast('Data pushed to cloud ✅', 'success');
+    } catch(e) {
+        console.error('Sync error:', e);
+        updateSyncStatus('error', 'Sync failed');
+        toast('Sync failed ❌', 'error');
+    }
+    isSyncing = false;
+}
+
+async function syncFromCloud() {
+    if (!USE_CLOUD) return;
+    if (isSyncing) return;
+    
+    isSyncing = true;
+    updateSyncStatus('syncing', 'Fetching from cloud...');
+    
+    try {
+        const response = await fetch(CLOUD_URL + '?action=getData');
+        const result = await response.json();
+        
+        if (result.success) {
+            // Merge cloud data with local
+            const cloudData = result.data;
+            let hasChanges = false;
+            
+            for (const [table, cloudRecords] of Object.entries(cloudData)) {
+                if (table === 'lastSync') continue;
+                if (Array.isArray(cloudRecords) && cloudRecords.length > 0) {
+                    // Compare with local
+                    const localRecords = data[table] || [];
+                    if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
+                        data[table] = cloudRecords;
+                        hasChanges = true;
+                    }
+                }
+            }
+            
+            if (hasChanges) {
+                localStorage.setItem(KEY, JSON.stringify(data));
+                lastSync = new Date().toISOString();
+                localStorage.setItem(KEY + '_lastSync', lastSync);
+                renderAll();
+                toast('Data synced from cloud ✅', 'success');
+                updateSyncStatus('success', 'Fetched from cloud');
+            } else {
+                toast('No changes in cloud', 'sync');
+                updateSyncStatus('success', 'Already in sync');
+            }
+        } else {
+            toast('Cloud sync failed: ' + (result.error || 'Unknown error'), 'error');
+            updateSyncStatus('error', 'Fetch failed');
+        }
+    } catch(e) {
+        console.error('Fetch error:', e);
+        // If no-cors mode was used, we can't read the response, but we can try the alternative
+        if (e.message.includes('no-cors')) {
+            toast('Please configure CORS or use the correct URL', 'error');
+            updateSyncStatus('error', 'CORS issue');
+        } else {
+            toast('Sync failed: ' + e.message, 'error');
+            updateSyncStatus('error', 'Connection failed');
+        }
+    }
+    isSyncing = false;
 }
 
 // ============================================
@@ -773,6 +908,21 @@ function updateHeaderStatus() {
 }
 
 // ============================================
+// SAVE FUNCTION (with auto-sync)
+// ============================================
+function save() {
+    localStorage.setItem(KEY, JSON.stringify(data));
+    renderAll();
+    updateHeaderStatus();
+    
+    // Auto-sync to cloud after save
+    if (USE_CLOUD && !isSyncing) {
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(() => syncToCloud(), 2000);
+    }
+}
+
+// ============================================
 // TABS
 // ============================================
 document.getElementById('tabContainer').addEventListener('click', function(e) {
@@ -866,7 +1016,7 @@ function addPhotoToRecord(recordType, recordIndex, base64) {
     }
     data[recordType][recordIndex].photos.push(base64);
     save();
-    toast('Photo added!');
+    toast('Photo added!', 'success');
 }
 
 function removePhoto(recordType, recordIndex, photoIndex) {
@@ -877,7 +1027,6 @@ function removePhoto(recordType, recordIndex, photoIndex) {
 }
 
 function takePhoto(recordType, recordIndex) {
-    // For web/iPhone: use file input
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -1054,7 +1203,7 @@ function renderDashboard() {
 }
 
 // ============================================
-// RENDER LISTS - WITH PHOTO BUTTONS ALWAYS VISIBLE
+// RENDER LISTS
 // ============================================
 function renderHours() {
     const el = document.getElementById('hours-list');
@@ -1165,7 +1314,7 @@ function exportData() {
     a.download = 'kubota_tracker_backup_' + today() + '.json';
     a.click();
     URL.revokeObjectURL(url);
-    toast('Data exported ✅');
+    toast('Data exported ✅', 'success');
 }
 
 function importData(event) {
@@ -1179,12 +1328,12 @@ function importData(event) {
                 if (!confirm('This will REPLACE all current data. Continue?')) return;
                 data = imported;
                 save();
-                toast('Data imported successfully ✅');
+                toast('Data imported successfully ✅', 'success');
             } else {
-                toast('Invalid file format ❌');
+                toast('Invalid file format ❌', 'error');
             }
         } catch(err) {
-            toast('Error reading file ❌');
+            toast('Error reading file ❌', 'error');
         }
     };
     reader.readAsText(file);
@@ -1201,7 +1350,7 @@ function addHours() {
     const attach = document.getElementById('h-attach').value;
     const notes = document.getElementById('h-notes').value;
     
-    if (!session) { toast('Please enter hours worked'); return; }
+    if (!session) { toast('Please enter hours worked', 'error'); return; }
     
     let tractorValue = tractor;
     if (!tractorValue || tractorValue === '') {
@@ -1217,7 +1366,7 @@ function addHours() {
     document.getElementById('h-attach').value = 'none';
     
     save();
-    toast('Hours logged ✅');
+    toast('Hours logged ✅', 'success');
 }
 
 function addService() {
@@ -1228,14 +1377,14 @@ function addService() {
     const by = document.getElementById('s-by').value;
     const notes = document.getElementById('s-notes').value;
     
-    if (!type) { toast('Please select a service type'); return; }
+    if (!type) { toast('Please select a service type', 'error'); return; }
     
     data.service.push({ date, type, hours, cost, by, notes, photos: [] });
     document.getElementById('s-cost').value = '';
     document.getElementById('s-by').value = '';
     document.getElementById('s-notes').value = '';
     save();
-    toast('Service logged ✅');
+    toast('Service logged ✅', 'success');
 }
 
 function addFuel() {
@@ -1244,14 +1393,14 @@ function addFuel() {
     const price = document.getElementById('f-price').value;
     const notes = document.getElementById('f-notes').value;
     
-    if (!litres) { toast('Please enter litres'); return; }
+    if (!litres) { toast('Please enter litres', 'error'); return; }
     
     data.fuel.push({ date, litres, price, notes, photos: [] });
     document.getElementById('f-litres').value = '';
     document.getElementById('f-price').value = '';
     document.getElementById('f-notes').value = '';
     save();
-    toast('Fuel logged ✅');
+    toast('Fuel logged ✅', 'success');
 }
 
 function addFluid() {
@@ -1266,7 +1415,7 @@ function addFluid() {
     document.getElementById('fl-cost').value = '';
     document.getElementById('fl-brand').value = '';
     save();
-    toast('Fluid change logged ✅');
+    toast('Fluid change logged ✅', 'success');
 }
 
 // ============================================
@@ -1289,8 +1438,22 @@ document.getElementById('fl-date').value = today();
 setupSessionListener();
 renderAll();
 
+// Set up auto-sync
+if (USE_CLOUD) {
+    // Initial sync from cloud after 2 seconds
+    setTimeout(syncFromCloud, 2000);
+    // Periodic sync every 30 seconds
+    setInterval(() => {
+        if (!isSyncing) syncFromCloud();
+    }, SYNC_INTERVAL);
+    updateSyncStatus('success', 'Cloud sync enabled');
+} else {
+    updateSyncStatus(null, 'Local mode');
+}
+
 console.log('🚜 Kubota B5000 Tracker loaded');
 console.log('📊 Records:', data.hours.length + ' hours, ' + data.service.length + ' services, ' + data.fuel.length + ' fuel, ' + data.fluids.length + ' fluids');
+console.log('☁️ Cloud sync:', USE_CLOUD ? 'Enabled' : 'Disabled');
 </script>
 </body>
 </html>

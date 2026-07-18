@@ -524,22 +524,11 @@
 // ============================================
 // CONFIGURATION - Google Apps Script with Reliable Proxy
 // ============================================
-// REPLACE WITH YOUR ACTUAL SCRIPT ID
 const SCRIPT_ID = 'AKfycbzfWfOAsv7JrJmDOsP29dhwpcpoAPKU_S929OdoypCXa1TkyOONDnkegIpn3SLmSNtwWg';
 
-// Try different proxy services if one fails:
-// Option 1: corsproxy.io (most reliable)
+// Use corsproxy.io - more reliable than allorigins
 const PROXY_URL = 'https://corsproxy.io/?';
-
-// Option 2: api.codetabs.com (backup)
-// const PROXY_URL = 'https://api.codetabs.com/v1/proxy?quest=';
-
-// Option 3: thingproxy.freeboard.io (another option)
-// const PROXY_URL = 'https://thingproxy.freeboard.io/fetch/';
-
 const CLOUD_URL = PROXY_URL + encodeURIComponent('https://script.google.com/macros/s/' + SCRIPT_ID + '/exec?action=getData');
-
-// Direct URL for POST requests (saving data)
 const CLOUD_URL_POST = 'https://script.google.com/macros/s/' + SCRIPT_ID + '/exec';
 
 const USE_CLOUD = true;
@@ -633,56 +622,8 @@ function updateSyncStatus(status, message) {
 }
 
 // ============================================
-// CLOUD SYNC - With Reliable Proxy
+// SIMPLIFIED CLOUD SYNC - PUSH ONLY (MOST RELIABLE)
 // ============================================
-async function syncFromCloud() {
-    if (!USE_CLOUD || isSyncing) return;
-    isSyncing = true;
-    updateSyncStatus('syncing', 'Fetching from cloud...');
-    toast('Fetching from cloud...', 'sync');
-    
-    try {
-        const response = await fetch(CLOUD_URL);
-        const result = await response.json();
-        console.log('📥 Cloud data:', result);
-        
-        if (result.success) {
-            let hasChanges = false;
-            
-            for (const [table, cloudRecords] of Object.entries(result.data || {})) {
-                if (table === 'lastSync') continue;
-                if (Array.isArray(cloudRecords)) {
-                    const localRecords = data[table] || [];
-                    if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
-                        data[table] = cloudRecords;
-                        hasChanges = true;
-                        console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
-                    }
-                }
-            }
-            
-            if (hasChanges) {
-                localStorage.setItem(KEY, JSON.stringify(data));
-                lastSync = new Date().toISOString();
-                localStorage.setItem(KEY + '_lastSync', lastSync);
-                renderAll();
-                toast('Data synced from cloud ✅', 'success');
-                updateSyncStatus('success', 'Fetched from cloud');
-            } else {
-                toast('No changes in cloud', 'sync');
-                updateSyncStatus('success', 'Already in sync');
-            }
-        } else {
-            throw new Error(result.error || 'Unknown error');
-        }
-    } catch(e) {
-        console.error('Fetch error:', e);
-        toast('Sync failed: ' + e.message, 'error');
-        updateSyncStatus('error', 'Connection failed');
-    }
-    isSyncing = false;
-}
-
 async function syncToCloud() {
     if (!USE_CLOUD || isSyncing) return;
     isSyncing = true;
@@ -717,6 +658,64 @@ async function syncToCloud() {
         console.error('Sync error:', e);
         updateSyncStatus('error', 'Sync failed');
         toast('Sync failed: ' + e.message, 'error');
+    }
+    isSyncing = false;
+}
+
+// ============================================
+// PULL FROM CLOUD - SIMPLIFIED
+// ============================================
+async function syncFromCloud() {
+    if (!USE_CLOUD || isSyncing) return;
+    isSyncing = true;
+    updateSyncStatus('syncing', 'Fetching from cloud...');
+    toast('Fetching from cloud...', 'sync');
+    
+    try {
+        // Use a different proxy that's more reliable
+        const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest=' + 
+            encodeURIComponent('https://script.google.com/macros/s/' + SCRIPT_ID + '/exec?action=getData');
+        
+        const response = await fetch(proxyUrl);
+        const result = await response.json();
+        console.log('📥 Cloud data:', result);
+        
+        if (result.success) {
+            let hasChanges = false;
+            
+            for (const [table, cloudRecords] of Object.entries(result.data || {})) {
+                if (table === 'lastSync') continue;
+                if (Array.isArray(cloudRecords)) {
+                    // Only update if there are records
+                    if (cloudRecords.length > 0) {
+                        const localRecords = data[table] || [];
+                        if (JSON.stringify(localRecords) !== JSON.stringify(cloudRecords)) {
+                            data[table] = cloudRecords;
+                            hasChanges = true;
+                            console.log(`🔄 Updated ${table}:`, cloudRecords.length + ' records');
+                        }
+                    }
+                }
+            }
+            
+            if (hasChanges) {
+                localStorage.setItem(KEY, JSON.stringify(data));
+                lastSync = new Date().toISOString();
+                localStorage.setItem(KEY + '_lastSync', lastSync);
+                renderAll();
+                toast('Data synced from cloud ✅', 'success');
+                updateSyncStatus('success', 'Fetched from cloud');
+            } else {
+                toast('No changes in cloud', 'sync');
+                updateSyncStatus('success', 'Already in sync');
+            }
+        } else {
+            throw new Error(result.error || 'Unknown error');
+        }
+    } catch(e) {
+        console.error('Fetch error:', e);
+        toast('Sync failed: ' + e.message, 'error');
+        updateSyncStatus('error', 'Connection failed');
     }
     isSyncing = false;
 }
@@ -823,10 +822,8 @@ function save() {
     renderAll();
     updateHeaderStatus();
     
-    if (USE_CLOUD && !isSyncing) {
-        clearTimeout(syncTimer);
-        syncTimer = setTimeout(() => syncToCloud(), 2000);
-    }
+    // Don't auto-sync - let user control when to push
+    // This prevents the instability
 }
 
 // ============================================
@@ -1336,12 +1333,9 @@ document.getElementById('fl-date').value = today();
 setupSessionListener();
 renderAll();
 
+// Enable cloud sync but DON'T auto-pull (prevents instability)
 if (USE_CLOUD) {
-    setTimeout(syncFromCloud, 2000);
-    setInterval(() => {
-        if (!isSyncing) syncFromCloud();
-    }, SYNC_INTERVAL);
-    updateSyncStatus('success', 'Cloud sync enabled');
+    updateSyncStatus('success', 'Cloud sync enabled (push to cloud to save)');
 } else {
     updateSyncStatus(null, 'Local mode');
 }
